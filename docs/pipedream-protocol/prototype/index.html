@@ -1,0 +1,597 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Pipedream Protocol - Preview</title>
+<style>
+  :root{
+    --cyan:#22D3EE; --magenta:#E23A8E; --amber:#F59E0B; --green:#34D399;
+    --gold:#FBBF24; --navy:#0B1220; --ink:#E6F0FF;
+    --panel:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; height:100%; background:var(--navy); color:var(--ink);
+    font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif; overflow:hidden;
+    touch-action:manipulation; user-select:none}
+  #app{position:fixed; inset:0; display:flex; flex-direction:column}
+  #hud{display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap;
+    background:linear-gradient(180deg,rgba(0,0,0,.35),transparent); z-index:5}
+  .score{display:flex; align-items:center; gap:6px; font-weight:600; font-size:12px}
+  .drop{width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+    background:var(--cyan); box-shadow:0 0 8px var(--cyan)}
+  #obj{flex:1; min-width:140px; text-align:center; opacity:.9; font-size:12px; letter-spacing:.2px}
+  .pill{background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:4px 10px; font-size:11px}
+  #stage{position:relative; flex:1; min-height:0}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+  #brick{position:absolute; left:14px; bottom:14px; width:118px; z-index:4;
+    transition:transform .3s; pointer-events:none}
+  #speech{position:absolute; left:140px; bottom:30px; max-width:56%; z-index:4;
+    background:#fff; color:#0b1220; padding:9px 12px; border-radius:14px;
+    box-shadow:0 6px 24px rgba(0,0,0,.4); font-weight:500; font-size:13px; line-height:1.35}
+  #speech::after{content:""; position:absolute; left:-9px; bottom:14px;
+    border:9px solid transparent; border-right-color:#fff; border-left:0}
+  .hidden{opacity:0; visibility:hidden}
+  #phoneWrap{position:relative; height:44%; min-height:230px;
+    background:linear-gradient(180deg,#0b1424,#070d18);
+    border-top:1px solid var(--line); overflow:hidden}
+  #hands{position:absolute; inset:0; pointer-events:none}
+  .hand{position:absolute; bottom:-6px; width:42%; height:80%;
+    background:radial-gradient(120% 90% at 50% 100%, #d9a06b, #b97d44);
+    border-radius:48% 52% 40% 60%/60% 60% 40% 40%; opacity:.92}
+  .hand.l{left:-14%; transform:rotate(8deg)}
+  .hand.r{right:-14%; transform:rotate(-8deg) scaleX(-1)}
+  #phone{position:absolute; left:50%; bottom:6%; transform:translateX(-50%);
+    width:min(220px,62%); aspect-ratio:9/19.5; background:#0a0f1c;
+    border:6px solid #1c2740; border-radius:26px; box-shadow:0 10px 40px rgba(0,0,0,.6);
+    overflow:hidden; z-index:2}
+  #notch{position:absolute; top:5px; left:50%; transform:translateX(-50%);
+    width:54px; height:8px; background:#000; border-radius:6px}
+  #statusbar{display:flex; justify-content:space-between; align-items:center;
+    padding:6px 10px; font-size:10px; color:#9fb3d1}
+  #screen{position:absolute; top:22px; left:0; right:0; bottom:0; padding:10px}
+  #appgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:4px}
+  .app{aspect-ratio:1; border-radius:12px; background:var(--panel);
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-size:10px; text-align:center; cursor:pointer; color:#cfe0ff}
+  .app.mail{background:linear-gradient(135deg,#1e3a5f,#22d3ee22)}
+  .app.mail.on{border-color:var(--cyan); box-shadow:0 0 12px var(--cyan)}
+  #mailform{position:absolute; inset:0; background:#0a0f1c; padding:10px; display:none}
+  #mailform.show{display:block}
+  #mailform input{width:100%; margin:5px 0; padding:8px; border-radius:8px;
+    border:1px solid var(--line); background:#0e1626; color:#fff; font-size:12px}
+  #preview{margin-top:4px; font-size:10.5px; color:#9fb3d1;
+    border:1px dashed var(--line); border-radius:8px; padding:6px}
+  .chip{color:var(--cyan)} .chip.warn{color:var(--amber)}
+  #send{margin-top:8px; width:100%; padding:9px; border:0; border-radius:10px;
+    background:linear-gradient(135deg,var(--cyan),#0ea5e0); color:#04222e;
+    font-weight:700; cursor:pointer}
+  #cohort{position:absolute; top:8px; right:10px; z-index:6; display:flex; gap:4px}
+  .cbtn{font-size:10px; padding:4px 7px; border-radius:8px; border:1px solid var(--line);
+    background:var(--panel); color:#cfe0ff; cursor:pointer}
+  .cbtn.sel{background:var(--cyan); color:#04222e; border-color:var(--cyan)}
+  #hint{position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+    z-index:6; font-size:11px; color:#9fb3d1; text-align:center; width:92%}
+  #replay{position:absolute; right:10px; bottom:10px; z-index:6; font-size:11px;
+    padding:6px 10px; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel); color:#cfe0ff; cursor:pointer}
+  #xraycard{position:absolute; z-index:7; background:#04101e; color:#cfe0ff;
+    border:1px solid var(--cyan); border-radius:10px; padding:8px 10px; font-size:11px;
+    max-width:200px; display:none}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.55)}
+    70%{box-shadow:0 0 0 12px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
+  .pulse{animation:pulse 1.4s infinite}
+  #helpBtn{cursor:pointer}
+  #quiz{position:absolute; inset:0; background:#0a0f1c; padding:10px; display:none; z-index:3; overflow:auto}
+  #quiz.show{display:block}
+  #quizQ{font-size:12px; margin-bottom:6px; font-weight:600; color:#cfe0ff}
+  .qopt{display:block; width:100%; margin:5px 0; padding:8px; border-radius:8px;
+    border:1px solid var(--line); background:#0e1626; color:#fff; font-size:11px;
+    text-align:left; cursor:pointer}
+  .qopt:hover{border-color:var(--cyan)}
+  #cookie{position:absolute; left:0; right:0; bottom:0; display:none; z-index:3;
+    background:#0e1626; border-top:1px solid var(--line); padding:8px; font-size:10.5px}
+  #cookie.show{display:block}
+  #cookie button{margin-top:6px; margin-right:6px; padding:7px 9px; border-radius:8px;
+    border:1px solid var(--line); background:#0e1626; color:#fff; font-size:10.5px; cursor:pointer}
+  #cookie .ess{border-color:var(--cyan); color:#04222e; background:var(--cyan)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="score"><span class="drop" id="cwDrop"></span><span id="cwVal">100</span> CW</div>
+    <div class="score"><span id="xpVal">0</span> XP</div>
+    <div id="obj">Mission: send your first bucket</div>
+    <div class="pill"><span id="lvlVal">Lv 1</span> &middot; <span id="comboVal"></span></div>
+    <div class="pill" id="helpBtn">? Help</div>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="brick">
+      <svg viewBox="0 0 100 140" width="100%">
+        <rect x="30" y="6" width="40" height="40" rx="6" fill="#F7C948"/>
+        <circle cx="42" cy="24" r="4" fill="#0b1220"/>
+        <circle cx="58" cy="24" r="4" fill="#0b1220"/>
+        <path d="M40 40 Q50 46 60 40" stroke="#0b1220" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <rect x="26" y="50" width="48" height="44" rx="8" fill="#1e3a5f"/>
+        <rect x="26" y="50" width="48" height="20" rx="8" fill="#22d3ee33"/>
+        <rect x="34" y="96" width="14" height="34" rx="4" fill="#F7C948"/>
+        <rect x="52" y="96" width="14" height="34" rx="4" fill="#F7C948"/>
+      </svg>
+    </div>
+    <div id="speech">Welcome, Piper. I'm Brick. Tap <b>MailDrop</b> on your phone &#128071;</div>
+    <div id="cohort">
+      <div class="cbtn" data-c="t">12-17</div>
+      <div class="cbtn sel" data-c="y">18-30</div>
+      <div class="cbtn" data-c="p">31-45</div>
+      <div class="cbtn" data-c="m">45+</div>
+    </div>
+    <div id="xraycard"></div>
+  </div>
+  <div id="phoneWrap">
+    <div id="hands"><div class="hand l"></div><div class="hand r"></div></div>
+    <div id="phone">
+      <div id="notch"></div>
+      <div id="statusbar"><span>9:41</span><span id="net">Wi-Fi</span></div>
+      <div id="screen">
+        <div id="appgrid">
+          <div class="app mail" id="appMail">MailDrop</div>
+          <div class="app">Streamly</div>
+          <div class="app">Chirp</div>
+          <div class="app">Browser</div>
+        </div>
+        <div id="mailform">
+          <div style="font-size:11px;color:#9fb3d1">MailDrop &middot; sign up</div>
+          <input id="handle" placeholder="handle (e.g. sam)" />
+          <input id="pw" placeholder="passphrase (8+ chars = clean)" type="password" />
+          <div id="preview">This address sends: <span class="chip">mail &#10003; resets &#10003;</span><br>
+            Password: <span class="chip warn" id="pww">murky water</span></div>
+          <button id="send">Create &amp; send first bucket &#9654;</button>
+        </div>
+        <div id="quiz">
+          <div id="quizQ"></div>
+          <div id="quizOpts"></div>
+        </div>
+        <div id="cookie">
+          <div>This site wants to drop cookies. "Essential only" keeps you clean.</div>
+          <button class="ess" id="cookieEssential">Essential only</button>
+          <button id="cookieAll">Accept all</button>
+        </div>
+      </div>
+    </div>
+    <div id="hint">Loop: send CLEAN buckets (strong pw), zap magenta leaks, hold board for X-Ray. Chain cleans for combo!</div>
+    <div id="replay" class="hidden">&#8635; Replay trace</div>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W=0,H=0,DPR=Math.min(2, window.devicePixelRatio||1);
+function resize(){ W=cv.clientWidth; H=cv.clientHeight; cv.width=W*DPR; cv.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',resize); resize();
+
+function nodes(){ return [
+  {x:W*0.5, y:H*0.86, label:'phone'},
+  {x:W*0.5, y:H*0.66, label:'router'},
+  {x:W*0.5, y:H*0.42, label:'ISP'},
+  {x:W*0.5, y:H*0.16, label:'reservoir'} ]; }
+
+const LINES = {
+  t:{open:"Tap MailDrop! That free stuff isn't free - watch what you send.",
+     send:"BOOM. First bucket!! okay I'm calm. That's your email crossing town.",
+     xray:"Freeze! Tap a packet to see what's inside. Spies hate this.",
+     lvl:"Level up! New pipe skin unlocked. You're officially a cleaner.",
+     mission:"Nice. Next mission's on the top bar - go get it.",
+     combo:"COMBO x{n}! You're on fire - keep the clean chain going!"},
+  y:{open:"Open MailDrop. Pro tip: your email is your internet passport. Boring lasts.",
+     send:"That was your email crossing town. Later, we follow one across the ocean.",
+     xray:"X-Ray on. Inspect the bucket - see exactly what's riding along.",
+     lvl:"Pipe skin unlocked. The board levels up with you. Keep the chain.",
+     mission:"Mission cleared. Streak's building. Don't break it.",
+     combo:"COMBO x{n}! That's the energy. Gatekeepers hate this."},
+  p:{open:"Open MailDrop. Fifteen minutes here saves hours of cleanup later.",
+     send:"Noted. That took four seconds. The visualizations get interesting from here.",
+     xray:"X-Ray pause. Reviewing packet contents is a core habit - use it often.",
+     lvl:"Promotion earned: new pipe skin. Hygiene compounds over time.",
+     mission:"Task complete. The next one is queued above.",
+     combo:"COMBO x{n}. Efficient and clean - exactly the habit."},
+  m:{open:"Hello, and welcome. Tap MailDrop when you're ready - no rush at all.",
+     send:"There it goes. Beautifully done. That little bucket was yours, traveling safely.",
+     xray:"Take your time. The pause lets us look closely at what's inside a packet.",
+     lvl:"Well done - a new pipe skin. The board grows as you learn.",
+     mission:"Nicely done. Your next small task is shown at the top.",
+     combo:"COMBO x{n}. Lovely rhythm - one clean step after another."}
+};
+let cohort='y';
+const speech=document.getElementById('speech');
+function say(t){ speech.textContent=t; speech.classList.remove('hidden'); }
+
+// ---------- GAME STATE / LOOP ----------
+const state = { xp:0, cw:100, level:1, combo:0, bestCombo:0, sent:0, leaksZapped:0 };
+const LEVEL_XP=[0,300,800,1500,2500,3800];
+const PIPE_SKINS=[
+  {core:'rgba(34,211,238,.35)', glow:'rgba(34,211,238,.12)'},
+  {core:'rgba(52,211,153,.35)', glow:'rgba(52,211,153,.12)'},
+  {core:'rgba(251,191,36,.35)', glow:'rgba(251,191,36,.12)'},
+  {core:'rgba(167,139,250,.35)', glow:'rgba(167,139,250,.12)'}
+];
+let skin=0;
+const MISSIONS=[
+  {kind:'clean', text:'Send a CLEAN bucket (strong password)', prog:0, goal:1},
+  {kind:'clean', text:'Send 2 CLEAN buckets in a row', prog:0, goal:2},
+  {kind:'xray',  text:'Inspect a packet with X-Ray (hold board)', prog:0, goal:1},
+  {kind:'leak',  text:'Zap 3 data leaks (tap magenta blobs)', prog:0, goal:3},
+  {kind:'leak',  text:'Zap 5 data leaks', prog:0, goal:5},
+  {kind:'combo', text:'Reach a 2x combo (chain clean sends)', prog:0, goal:1}
+];
+let missionIdx=0;
+function curMission(){ return MISSIONS[missionIdx]; }
+function nextMission(){
+  let n; do { n=Math.floor(Math.random()*MISSIONS.length); } while(n===missionIdx && MISSIONS.length>1);
+  missionIdx=n; MISSIONS[missionIdx].prog=0;
+}
+function updateObj(){
+  const m=curMission();
+  document.getElementById('obj').textContent='Mission: '+m.text+' ('+m.prog+'/'+m.goal+')';
+}
+function comboMult(){ return Math.min(3, 1 + Math.floor(state.combo/3)*0.5); }
+function awardXp(n){
+  state.xp+=n;
+  let lvl=1; for(let i=0;i<LEVEL_XP.length;i++) if(state.xp>=LEVEL_XP[i]) lvl=i+1;
+  if(lvl>state.level){ state.level=lvl; levelUp(); }
+}
+function levelUp(){
+  skin=(skin+1)%PIPE_SKINS.length;
+  say(LINES[cohort].lvl);
+  flash=1; floater(W/2,H*0.4,'LEVEL '+state.level+'!','#FBBF24');
+}
+function missionProg(kind,n){
+  const m=curMission();
+  if(m.kind!==kind) return;
+  m.prog=Math.min(m.goal, m.prog+n);
+  if(m.prog>=m.goal){
+    awardXp(50); nextMission(); say(LINES[cohort].mission); updateObj();
+  } else updateObj();
+}
+function onDeliver(clean){
+  state.sent++;
+  if(clean){
+    state.combo++; state.bestCombo=Math.max(state.bestCombo,state.combo);
+    burst(bucket.x,bucket.y,'#22D3EE');
+    const gain=Math.round(30*comboMult());
+    awardXp(gain); floater(bucket.x,bucket.y-18,'+'+gain+' XP','#22D3EE');
+    missionProg('clean',1);
+    if(state.combo>=2) missionProg('combo',1);
+    if([3,5,10,20,30].includes(state.combo)){
+      say(LINES[cohort].combo.replace('{n}',state.combo));
+      burst(bucket.x,bucket.y,'#FBBF24'); burst(bucket.x,bucket.y,'#FBBF24');
+      floater(bucket.x,bucket.y-34,'COMBO x'+comboMult().toFixed(1),'#FBBF24');
+    }
+  } else {
+    state.combo=0; state.cw=Math.max(0,state.cw-8);
+    burst(bucket.x,bucket.y,'#E23A8E'); awardXp(5);
+    floater(bucket.x,bucket.y-18,'+5 XP (murky)','#E23A8E');
+  }
+  maybeLeak();
+  if(!quizOpen) openQuiz();
+}
+
+// ---------- LEAKS (the contaminant mini-game) ----------
+let leaks=[];
+function spawnLeak(){
+  const maxL=Math.min(6, 2+state.level);
+  if(leaks.length>=maxL) return;
+  const ns=nodes(); const s=Math.floor(Math.random()*3);
+  const a=ns[s], b=ns[s+1];
+  const t=0.3+Math.random()*0.4;
+  leaks.push({ x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, r:11, life:1, spin:Math.random()*6 });
+}
+function maybeLeak(){
+  const maxL=Math.min(6, 2+state.level);
+  const rate=0.012+state.level*0.002;
+  if(Math.random()<rate && leaks.length<maxL) spawnLeak();
+}
+function updateLeaks(){
+  for(let i=leaks.length-1;i>=0;i--){
+    const l=leaks[i]; l.life-=0.004; l.spin+=0.08;
+    if(l.life<=0){ leaks.splice(i,1); state.cw=Math.max(0,state.cw-3); }
+  }
+}
+function zapAt(x,y){
+  for(let i=0;i<leaks.length;i++){
+    const l=leaks[i]; const dx=x-l.x, dy=y-l.y;
+    if(dx*dx+dy*dy <= (l.r+14)*(l.r+14)){
+      leaks.splice(i,1); state.leaksZapped++; state.cw=Math.min(100,state.cw+4);
+      burst(l.x,l.y,'#E23A8E'); awardXp(20); missionProg('leak',1); return true;
+    }
+  }
+  return false;
+}
+function drawLeaks(){
+  leaks.forEach(l=>{
+    ctx.save(); ctx.translate(l.x,l.y); ctx.rotate(l.spin);
+    ctx.shadowColor='#E23A8E'; ctx.shadowBlur=14; ctx.fillStyle='#E23A8E';
+    ctx.beginPath();
+    for(let k=0;k<10;k++){ const ang=k/10*Math.PI*2; const rad=k%2?l.r:l.r*0.5;
+      const px=Math.cos(ang)*rad, py=Math.sin(ang)*rad; k?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  });
+}
+
+// ---------- CELEBRATION PARTICLES ----------
+let burstP=[];
+function burst(x,y,color){
+  for(let i=0;i<14;i++) burstP.push({x,y,
+    vx:(Math.random()-0.5)*3, vy:-1-Math.random()*2.5, life:1, color});
+}
+function updateParticles(){
+  for(let i=burstP.length-1;i>=0;i--){
+    const p=burstP[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life-=0.02;
+    if(p.life<=0) burstP.splice(i,1);
+  }
+}
+function drawParticles(){
+  burstP.forEach(p=>{
+    ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,7); ctx.fill(); ctx.globalAlpha=1;
+  });
+}
+
+// ---------- FLOATING SCORE TEXT ----------
+let floaters=[];
+function floater(x,y,text,color){ floaters.push({x,y,text,color,life:1}); }
+function updateFloaters(){
+  for(let i=floaters.length-1;i>=0;i--){ const f=floaters[i]; f.y-=0.4; f.life-=0.015; if(f.life<=0) floaters.splice(i,1); }
+}
+function drawFloaters(){
+  ctx.textAlign='center';
+  floaters.forEach(f=>{ ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.color;
+    ctx.font='bold 13px system-ui'; ctx.fillText(f.text,f.x,f.y); ctx.globalAlpha=1; });
+}
+
+// ---------- TRACE ----------
+let phase='idle', bucket=null, xray=false, delivered=false, packets=[], flash=0;
+for(let i=0;i<18;i++) packets.push({p:Math.random(), s:0.2+Math.random()*0.3,
+  off:(Math.random()-0.5)*W*0.3, a:0.15+Math.random()*0.2});
+
+function startTrace(clean){
+  const ns=nodes();
+  bucket={seg:0, p:0, x:ns[0].x, y:ns[0].y, speed:1+state.level*0.08, clean:clean!==false};
+  phase='tracing'; delivered=false;
+  document.getElementById('replay').classList.add('hidden');
+  say(LINES[cohort].send);
+}
+
+function drawBucket(x,y,clean){
+  ctx.save();
+  ctx.shadowColor = clean ? '#22D3EE' : '#E23A8E';
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = clean ? '#22D3EE' : '#E23A8E';
+  ctx.beginPath();
+  ctx.moveTo(x-9,y-11); ctx.lineTo(x+9,y-11);
+  ctx.lineTo(x+9,y+7); ctx.quadraticCurveTo(x,y+15,x-9,y+7);
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(255,255,255,.55)';
+  ctx.beginPath(); ctx.ellipse(x,y-7,7,3,0,0,7); ctx.fill();
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0B1220'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(34,211,238,.06)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=28){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  const ns=nodes();
+  const sk=PIPE_SKINS[skin];
+  ctx.lineCap='round';
+  for(let i=0;i<ns.length-1;i++){
+    const a=ns[i], b=ns[i+1];
+    ctx.strokeStyle=sk.glow; ctx.lineWidth=14;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    ctx.strokeStyle=sk.core; ctx.lineWidth=6;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  ns.forEach(n=>{
+    ctx.fillStyle = n.label==='phone' ? '#22D3EE' : (n.label==='reservoir'?'#34D399':'#1e3a5f');
+    ctx.beginPath();ctx.arc(n.x,n.y, n.label==='phone'?10:9,0,7);ctx.fill();
+    ctx.fillStyle='#9fb3d1'; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText(n.label, n.x, n.y+22);
+  });
+
+  packets.forEach(pk=>{
+    const a=ns[0], b=ns[3];
+    const y=a.y+(b.y-a.y)*pk.p, x=a.x+pk.off;
+    ctx.globalAlpha=pk.a; ctx.fillStyle='#7dd3fc';
+    ctx.beginPath();ctx.arc(x,y,2.5,0,7);ctx.fill(); ctx.globalAlpha=1;
+    pk.p+=pk.s*0.004; if(pk.p>1) pk.p=0;
+  });
+
+  if(bucket && (phase==='tracing'||phase==='done')){
+    if(!xray && phase==='tracing'){
+      bucket.p += 0.014 * bucket.speed;
+      if(bucket.p>=1){ bucket.seg++; bucket.p=0;
+        if(bucket.seg>=3){ phase='done';
+          if(!delivered){ delivered=true; onDeliver(bucket.clean); }
+          document.getElementById('replay').classList.remove('hidden'); } }
+    }
+    if(phase==='done'){ bucket.x=ns[3].x; bucket.y=ns[3].y; }
+    else { const s=bucket.seg;
+      bucket.x=ns[s].x+(ns[s+1].x-ns[s].x)*bucket.p;
+      bucket.y=ns[s].y+(ns[s+1].y-ns[s].y)*bucket.p; }
+    drawBucket(bucket.x,bucket.y,bucket.clean);
+
+    if(xray){
+      const card=document.getElementById('xraycard');
+      card.style.display='block';
+      card.style.left=Math.min(bucket.x+14,W-210)+'px';
+      card.style.top=Math.max(8,bucket.y-20)+'px';
+      card.innerHTML='<b>Packet X-Ray</b><br>from: '+cohort+'-piper@pipedream.mail<br>'+
+        'to: reservoir<br>payload: mail, reset-token, passphrase-hash<br>'+
+        'water: <span style="color:'+(bucket.clean?'#22D3EE':'#E23A8E')+'">'+
+        (bucket.clean?'CLEAR':'TOXIC')+'</span>';
+    }
+  }
+
+  updateLeaks(); drawLeaks();
+  updateParticles(); drawParticles();
+  updateFloaters(); drawFloaters();
+  maybeLeak();
+  if(flash>0){ ctx.fillStyle='rgba(251,191,36,'+(flash*0.16)+')'; ctx.fillRect(0,0,W,H); flash-=0.03; }
+
+  // HUD sync
+  document.getElementById('cwVal').textContent=Math.round(state.cw);
+  document.getElementById('xpVal').textContent=state.xp;
+  document.getElementById('lvlVal').textContent='Lv '+state.level;
+  document.getElementById('comboVal').textContent=state.combo>0?('x'+comboMult().toFixed(1)):'';
+  if(!xray) document.getElementById('xraycard').style.display='none';
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ---------- LESSON / LEARNING ENGINE ----------
+const LESSONS=[
+  { id:1, name:'Email',
+    teach:{ t:"Your email is a bucket that travels the network. Send one - I'll show you.",
+            y:"Email = a water bucket leaving your phone. Send your first.",
+            p:"Email is your passport online. Set up a first account.",
+            m:"Sending email is like sending a little bucket of water through pipes. Try it." },
+    quiz:{ q:"When you send an email, what actually leaves your phone?",
+      opts:[["A water bucket that travels the network",true],
+            ["Nothing at all",false],
+            ["Only the words, never your address",false]] } },
+  { id:2, name:'Cookies',
+    teach:{ t:"Sites ask for cookies. 'Accept all' lets them follow you. Say no when you can.",
+            y:"Cookies = crumbs that track you. Essential-only keeps you clean.",
+            p:"Cookie banners: pick 'Essential only' to limit sharing.",
+            m:"A cookie is a small note a site leaves. Too many lets shops follow you. Pick fewer." },
+    quiz:{ q:"What does 'Accept All' on a cookie banner usually allow?",
+      opts:[["Sites to track you across the web",true],
+            ["Makes your phone faster",false],
+            ["Nothing changes",false]] } },
+  { id:3, name:'Passwords',
+    teach:{ t:"A long passphrase is like a weird sentence. Hard to guess, easy to remember.",
+            y:"Length beats symbols. Four random words > 'P@ssw0rd'.",
+            p:"Use a long passphrase; length dominates strength.",
+            m:"A long string of words is easy for you and hard for thieves. Pick four words." },
+    quiz:{ q:"Why is a long passphrase safer than a short complex one?",
+      opts:[["It has far more possible combinations",true],
+            ["Shorter passwords are always fine",false],
+            ["Only symbols matter",false]] } }
+];
+let lessonIdx=0, quizOpen=false;
+function guide(id){ document.querySelectorAll('.pulse').forEach(e=>e.classList.remove('pulse'));
+  const el=document.getElementById(id); if(el) el.classList.add('pulse'); }
+function showCookie(show){ const c=document.getElementById('cookie'); if(c) c.classList.toggle('show', !!show); }
+function startLesson(i){
+  lessonIdx=i; const L=LESSONS[i];
+  say(L.teach[cohort]);
+  document.getElementById('obj').textContent='Lesson '+L.id+' - '+L.name+': follow Brick\'s hint';
+  guide('appMail');
+  showCookie(L.id===2);
+  document.getElementById('appMail').classList.remove('on');
+  document.getElementById('mailform').classList.remove('show');
+  document.getElementById('appgrid').style.display='grid';
+  quizOpen=false; document.getElementById('quiz').classList.remove('show');
+}
+function openQuiz(){
+  const L=LESSONS[lessonIdx], q=L.quiz; quizOpen=true;
+  document.getElementById('quizQ').textContent=q.q;
+  const box=document.getElementById('quizOpts'); box.innerHTML='';
+  q.opts.forEach(([txt,correct])=>{
+    const b=document.createElement('button'); b.className='qopt'; b.textContent=txt;
+    b.addEventListener('click',()=>answerQuiz(correct));
+    box.appendChild(b);
+  });
+  document.getElementById('quiz').classList.add('show');
+  say('Quick check - no rush. Pick the best answer.');
+}
+function answerQuiz(correct){
+  if(correct){
+    awardXp(40); document.getElementById('quiz').classList.remove('show'); quizOpen=false;
+    floater(W/2,H*0.4,'+40 XP - learned!','#34D399');
+    say(LINES[cohort].mission);
+    const next=(lessonIdx+1)%LESSONS.length;
+    setTimeout(()=>startLesson(next), 700);
+  } else {
+    state.cw=Math.max(0,state.cw-2);
+    const wrong={ t:"Not quite - take another look, you got this.",
+      y:"Close. The receipt was the tell. Try again.",
+      p:"Almost - review the hint and retry.",
+      m:"Not quite - look again, there's no rush." };
+    say(wrong[cohort]);
+  }
+}
+
+// ---- interactions ----
+document.getElementById('appMail').addEventListener('click',()=>{
+  document.getElementById('appMail').classList.add('on');
+  document.getElementById('mailform').classList.add('show');
+  document.getElementById('appgrid').style.display='none';
+  say(LINES[cohort].open);
+});
+document.getElementById('send').addEventListener('click',()=>{
+  const pw=document.getElementById('pw').value;
+  const weak = pw.length<8;
+  const pww=document.getElementById('pww');
+  pww.textContent = weak ? 'murky water' : 'crystal clear';
+  pww.className = weak ? 'chip warn' : 'chip';
+  startTrace(!weak);
+});
+document.getElementById('replay').addEventListener('click', startTrace);
+
+document.querySelectorAll('.cbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.cbtn').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); cohort=b.dataset.c; say(LINES[cohort].open);
+}));
+
+// cookie banner (Lesson 2 hands-on moment)
+document.getElementById('cookieEssential').addEventListener('click',()=>{
+  showCookie(false); awardXp(10); say('Essential only - clean choice. That keeps your water clear.');
+});
+document.getElementById('cookieAll').addEventListener('click',()=>{
+  showCookie(false); state.cw=Math.max(0,state.cw-6); spawnLeak(); spawnLeak();
+  say('Accept-all left crumbs behind. Watch the magenta trackers ride your pipes.');
+});
+// help button re-states the current lesson hint (easy mode)
+document.getElementById('helpBtn').addEventListener('click',()=>{ say(LESSONS[lessonIdx].teach[cohort]); });
+
+// long-press whiteboard = X-Ray freeze toggle; short tap = zap leak
+const stageEl=document.getElementById('stage');
+let pressT=null;
+function down(){
+  pressT=setTimeout(()=>{
+    if(!bucket){ say('Send a bucket first, then inspect it.'); return; }
+    xray=!xray;
+    if(xray){ say(LINES[cohort].xray); missionProg('xray',1); }
+  },350);
+}
+function up(){ if(pressT){ clearTimeout(pressT); pressT=null; } }
+stageEl.addEventListener('mousedown',down);
+stageEl.addEventListener('mouseup',up);
+stageEl.addEventListener('mouseleave',up);
+stageEl.addEventListener('touchstart',down,{passive:true});
+stageEl.addEventListener('touchend',up);
+stageEl.addEventListener('click',(e)=>{
+  const r=stageEl.getBoundingClientRect();
+  const x=(e.clientX!=null?e.clientX:0)-r.left;
+  const y=(e.clientY!=null?e.clientY:0)-r.top;
+  // tap a traveling bucket to speed it up (active play = faster loop)
+  if(phase==='tracing' && bucket){
+    const dx=x-bucket.x, dy=y-bucket.y;
+    if(dx*dx+dy*dy < 40*40){ bucket.speed=Math.min(5, bucket.speed*1.6); floater(bucket.x,bucket.y-18,'FAST!','#22D3EE'); return; }
+  }
+  zapAt(x,y);
+});
+
+updateObj();
+startLesson(0);
+window.__pp = { state, spawnLeak, zapAt, leaks:()=>leaks, startTrace, answerQuiz, startLesson, LESSONS };
+</script>
+</body>
+</html>
