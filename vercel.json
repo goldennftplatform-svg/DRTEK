@@ -1,5 +1,5 @@
 {
-  "framework": "vite",
-  "buildCommand": "cd app && npm run build",
-  "outputDirectory": "app/dist"
+  "installCommand": "cd docs/pipedream-protocol/app && npm install",
+  "buildCommand": "cd docs/pipedream-protocol/app && npm run build",
+  "outputDirectory": "docs/pipedream-protocol/app/dist"
 }
