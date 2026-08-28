@@ -22,6 +22,8 @@ export class Phone {
   private quizQ!: HTMLElement;
   private quizOpts!: HTMLElement;
   private cookie!: HTMLElement;
+  private cookieTimerEl!: HTMLElement;
+  private cookieTimerId: number | null = null;
   private mailCallout!: HTMLElement;
   private hintEl!: HTMLElement;
 
@@ -83,9 +85,12 @@ export class Phone {
       { id: 'cookie' },
       el('div', { className: 'cookie-title', textContent: 'This site wants cookies' }),
       el('div', { className: 'cookie-sub', textContent: "'Essential only' keeps your data clean. 'Accept all' lets trackers follow you." }),
+      el('div', { className: 'cookie-timesup', textContent: 'Times up — it chose for you!' }),
       cookieEssential,
-      cookieAll
+      cookieAll,
+      el('div', { className: 'cookie-timer' })
     );
+    this.cookieTimerEl = this.cookie.querySelector('.cookie-timer') as HTMLElement;
 
     const screen = el('div', { id: 'screen' }, this.appgrid, this.mailform, this.quiz, this.cookie);
     const phone = el(
@@ -97,7 +102,7 @@ export class Phone {
     );
     const hint = el('div', {
       id: 'hint',
-      textContent: 'Send clean buckets · Zap leaks · Keep your water above zero'
+      textContent: 'Send clean buckets · Zap leaks · X-Ray catches thieves · Keep water above zero'
     });
     this.hintEl = hint;
     const replay = el('div', { id: 'replay', textContent: '⟲ Replay' });
@@ -117,6 +122,7 @@ export class Phone {
     this.mailCallout.style.display = 'none';
     // Never let the cookie banner cover the Send button while typing
     this.cookie.classList.remove('show');
+    this.stopCookieTimer();
   }
   resetForm() {
     this.appMail.classList.remove('on');
@@ -167,11 +173,39 @@ export class Phone {
     });
     this.quiz.classList.add('show');
     this.cookie.classList.remove('show');
+    this.stopCookieTimer();
   }
   hideQuiz() {
     this.quiz.classList.remove('show');
   }
-  showCookie(b: boolean) {
+  showCookie(b: boolean, opts?: { durationMs?: number; onTimeout?: () => void }) {
     this.cookie.classList.toggle('show', b);
+    const timed = b && !!opts?.onTimeout && (opts.durationMs ?? 0) > 0;
+    this.cookie.classList.toggle('timed', timed);
+    if (!b) {
+      this.stopCookieTimer();
+      return;
+    }
+    if (!timed) return;
+    this.stopCookieTimer();
+    this.cookieTimerEl.style.width = '100%';
+    const ms = opts!.durationMs!;
+    const start = performance.now();
+    this.cookieTimerId = window.setInterval(() => {
+      const remain = 1 - (performance.now() - start) / ms;
+      this.cookieTimerEl.style.width = `${Math.max(0, remain * 100)}%`;
+      if (remain <= 0) {
+        this.stopCookieTimer();
+        opts?.onTimeout?.();
+      }
+    }, 100);
+  }
+
+  private stopCookieTimer() {
+    if (this.cookieTimerId !== null) {
+      clearInterval(this.cookieTimerId);
+      this.cookieTimerId = null;
+    }
+    this.cookieTimerEl.style.width = '0%';
   }
 }

@@ -82,12 +82,14 @@ export class Game {
     await this.wb.init(this.stage);
     this.wb.onDeliver = (clean) => this.onDeliver(clean);
     this.wb.onFrame = (dtSec) => this.onFrame(dtSec);
+    this.wb.onThiefMissed = () => this.onThiefMissed();
     this.wb.setLeakCap(4);
     this.wireStageInput();
     window.addEventListener('resize', () => this.wb.relayout());
 
     // ---- Begin ----
     this.state.on('levelup', () => this.onLevelUp());
+    this.state.on('tide', (on) => { if (on) this.onTide(); });
     (window as any).Pipedream = { state: this.state, wb: this.wb, lessonCount: LESSONS.length };
     this.buildIntro();
   }
@@ -200,10 +202,20 @@ export class Game {
 
   private leakTimer = 0;
   private leakTutorialShown = false;
+  private dried = false;
+  private bossTimer = 0;
   private onFrame(dtSec: number) {
     if (this.phase < 9) return;
     // CW decay
     this.state.tickDt(dtSec);
+    // Pressure: active leaks and trackers siphon clean water.
+    const drain = this.wb.getLeakCount() * 0.5 + this.wb.getTrackerCount() * 0.08;
+    if (drain > 0) this.state.penalizeCw(drain * dtSec);
+    // Boss leak deadline (pauses while a quiz is open)
+    if (this.wb.hasBoss() && !this.state.quizOpen) {
+      this.bossTimer -= dtSec;
+      if (this.bossTimer <= 0 && this.wb.hasBoss()) this.bossTimeout();
+    }
     // Random leak spawning every 8-15 seconds
     this.leakTimer -= dtSec;
     if (this.leakTimer <= 0) {
@@ -215,6 +227,8 @@ export class Game {
         this.say('A leak appeared! Tap it on the network to zap it. Leaks drain your water.');
       }
     }
+    // Out of water -> game over (retry keeps the run)
+    if (this.state.cw <= 0 && !this.dried) this.showDriedOverlay();
   }
 
   // =====================================================================
@@ -232,6 +246,14 @@ export class Game {
     this.phone.showMailCallout(false);
     // Cookie banner is triggered AFTER the player sends (see onSend), so it never covers Send.
     this.phone.showCookie(false);
+    this.wb.clearBoss();
+    this.bossTimer = 0;
+    // Boss leak on every 3rd lesson (3, 6, 9) — optional bonus threat with a deadline.
+    if (this.phase === 9 && L.id % 3 === 0) {
+      this.wb.spawnBoss();
+      this.bossTimer = 20;
+      this.say(cohortLine(this.cohort, 'boss'));
+    }
     this.wb.showDecoys(L.id === 4);
     this.wb.showEncryption(L.id === 5);
     this.wb.showPrivacy(L.id === 6);
@@ -261,10 +283,16 @@ export class Game {
     } else {
       this.say(cohortLine(this.cohort, 'send'));
     }
-    // Cookies lesson: the site asks for cookies right after you send your data
+    // Cookies lesson: the site asks for cookies right after you send your data.
+    // It auto-picks "Accept all" if you don't decide within 5 seconds (feature: cookie roulette).
     if (LESSONS[this.state.lessonIdx].id === 2) {
-      setTimeout(() => this.phone.showCookie(true), 900);
+      setTimeout(() =>
+        this.phone.showCookie(true, { durationMs: 5000, onTimeout: () => this.cookieTimeout() }), 900);
     }
+  }
+
+  private cookieTimeout() {
+    this.handleCookie(false, true);
   }
 
   private onDeadApp() {
@@ -339,7 +367,7 @@ export class Game {
     }
   }
 
-  private handleCookie(essential: boolean) {
+  private handleCookie(essential: boolean, timedOut = false) {
     this.phone.showCookie(false);
     if (essential) {
       this.state.addXp(10);
@@ -349,8 +377,56 @@ export class Game {
       this.wb.spawnLeak();
       this.wb.spawnLeak();
       this.wb.spawnTrackers(18);
-      this.say('Accept-all invited 18 trackers to siphon your data. Look at them go.');
+      this.say(timedOut
+        ? 'You ran out of time — the site chose Accept-all for you. 18 trackers are siphoning your data.'
+        : 'Accept-all invited 18 trackers to siphon your data. Look at them go.');
     }
+  }
+
+  private onThiefMissed() {
+    sfx.zap();
+    this.state.penalizeCw(3);
+    this.say(cohortLine(this.cohort, 'thief'));
+  }
+
+  private onTide() {
+    sfx.levelup();
+    this.wb.tideFx();
+    this.say(cohortLine(this.cohort, 'tide'));
+  }
+
+  private bossTimeout() {
+    sfx.zap();
+    this.wb.bossFailFx();
+    this.wb.clearBoss();
+    this.bossTimer = 0;
+    this.state.penalizeCw(8);
+    this.say(cohortLine(this.cohort, 'bossFail'));
+  }
+
+  private showDriedOverlay() {
+    this.dried = true;
+    const overlay = el('div', { id: 'driedOverlay' });
+    overlay.innerHTML =
+      '<div class="dried-card">' +
+      '<div class="dried-title">The pipes ran dry</div>' +
+      '<div class="dried-sub">Leaks and trackers sucked away all your clean water.</div>' +
+      '<button id="pumpBack">Pump it back</button>' +
+      '</div>';
+    this.rootEl.append(overlay);
+    (overlay.querySelector('#pumpBack') as HTMLElement).onclick = () => this.pumpBack(overlay);
+    sfx.zap();
+  }
+
+  private pumpBack(overlay: HTMLElement) {
+    overlay.remove();
+    this.dried = false;
+    this.wb.clearThreats();
+    this.state.rewardCw(100);
+    this.state.tide = 0;
+    this.bossTimer = 0;
+    const i = this.state.lessonIdx;
+    this.startLesson(i > 0 ? i : 1);
   }
 
   private onLevelUp() {
@@ -462,6 +538,29 @@ export class Game {
     this.stage.addEventListener('click', (e) => {
       const { x, y } = rectXY(e as MouseEvent);
       if (this.wb.isTracing() && this.wb.tryBoost(x, y)) return;
+      // X-Ray thieves: tap a red packet to strip it (X-ray must be on).
+      if (this.wb.tryCatchThief(x, y)) {
+        sfx.zap();
+        this.state.addXp(15);
+        this.state.rewardCw(2);
+        return;
+      }
+      // Boss leak: multiple taps deal damage.
+      if (this.wb.hasBoss()) {
+        const res = this.wb.bossTap(x, y);
+        if (res === 'killed') {
+          sfx.levelup();
+          this.state.addXp(60);
+          this.state.rewardCw(10);
+          this.say('Boss leak burst! It never got your password.');
+          return;
+        }
+        if (res === 'hit') {
+          sfx.zap();
+          this.state.addXp(15);
+          return;
+        }
+      }
       if (this.wb.zapAt(x, y)) {
         sfx.zap();
         this.state.rewardCw(4);

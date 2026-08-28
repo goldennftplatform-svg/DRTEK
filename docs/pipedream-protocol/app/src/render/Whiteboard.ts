@@ -39,6 +39,19 @@ interface SiphonDrop {
   vy: number;
   life: number;
 }
+interface Thief {
+  prog: number;
+  speed: number;
+  pulse: number;
+}
+interface Boss {
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  flash: number;
+  t: number;
+}
 
 // The living whiteboard: nodes, pipes, traveling buckets, leaks, particles, floaters.
 // Pure renderer driven by Trace/state; no game rules live here (GDD 11.2).
@@ -70,6 +83,9 @@ export class Whiteboard {
   private trackerFish: TrackerFish[] = [];
   private siphonDrops: SiphonDrop[] = [];
   private cohort: string = 'y';
+  private thieves: Thief[] = [];
+  private thiefTimer = 0;
+  private boss: Boss | null = null;
 
   // Concept overlays per level (encryption / privacy / metadata / footprint / 2fa / safe-browse)
   private encOn = false;
@@ -92,6 +108,7 @@ export class Whiteboard {
 
   onDeliver?: (clean: boolean) => void;
   onFrame?: (dtSec: number) => void;
+  onThiefMissed?: () => void;
 
   async init(parent: HTMLElement) {
     this.parent = parent;
@@ -264,6 +281,111 @@ export class Whiteboard {
   hasBucket(): boolean {
     return !!this.bucket;
   }
+
+  // ---- pressure drain readings (feature: water pressure / stakes) ----
+  getLeakCount(): number {
+    return this.leaks.length;
+  }
+  getTrackerCount(): number {
+    return this.trackerFish.length;
+  }
+  leakPoints(): { x: number; y: number }[] {
+    return this.leaks.map((l) => ({ x: l.x, y: l.y }));
+  }
+  clearThreats() {
+    this.leaks = [];
+    this.trackerFish = [];
+    this.thieves = [];
+    this.boss = null;
+  }
+
+  // ---- X-Ray thief packets (feature: scan & catch) ----
+  private nodePathPoint(t: number): { x: number; y: number } {
+    const pts = this.nodes;
+    const seg = pts.length - 1;
+    const local = Math.min(1, Math.max(0, t)) * seg;
+    const i = Math.min(seg - 1, Math.floor(local));
+    const f = local - i;
+    return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * f, y: pts[i].y + (pts[i + 1].y - pts[i].y) * f };
+  }
+  private spawnThief() {
+    const p = this.nodePathPoint(0.35 + Math.random() * 0.3);
+    // thief trails the bucket, catching up slowly
+    this.thieves.push({ prog: 0.35 + Math.random() * 0.3, speed: 0.0024, pulse: Math.random() * 6 });
+  }
+  tryCatchThief(x: number, y: number): boolean {
+    if (!this.xray) return false;
+    for (let i = 0; i < this.thieves.length; i++) {
+      const t = this.thieves[i];
+      const p = this.nodePathPoint(t.prog);
+      const dx = x - p.x;
+      const dy = y - p.y;
+      if (dx * dx + dy * dy <= 20 * 20) {
+        this.thieves.splice(i, 1);
+        this.burst(p.x, p.y, 0xe23a8e);
+        this.floater(p.x, p.y - 14, 'STRIPPED +XP', 0x22d3ee);
+        return true;
+      }
+    }
+    return false;
+  }
+  hasThieves(): boolean {
+    return this.thieves.length > 0;
+  }
+
+  // ---- boss leak (feature: every 3rd lesson) ----
+  private bossPos(): { x: number; y: number } {
+    const n = this.nodes[this.nodes.length - 1];
+    return { x: n.x, y: n.y - 44 };
+  }
+  hasBoss(): boolean {
+    return !!this.boss;
+  }
+  bossPoint(): { x: number; y: number } | null {
+    return this.boss ? { x: this.boss.x, y: this.boss.y } : null;
+  }
+  bossHp(): number {
+    return this.boss ? this.boss.hp : 0;
+  }
+  spawnBoss() {
+    const p = this.bossPos();
+    this.boss = { x: p.x, y: p.y, hp: 6, maxHp: 6, flash: 0, t: 0 };
+    this.burst(p.x, p.y, 0xe23a8e);
+  }
+  clearBoss() {
+    this.boss = null;
+  }
+  bossTap(x: number, y: number): 'hit' | 'killed' | 'miss' {
+    if (!this.boss) return 'miss';
+    const b = this.boss;
+    const dx = x - b.x;
+    const dy = y - b.y;
+    if (dx * dx + dy * dy > 34 * 34) return 'miss';
+    b.hp--;
+    b.flash = 1;
+    this.burst(b.x, b.y - 10, 0xe23a8e);
+    if (b.hp <= 0) {
+      this.boss = null;
+      this.burst(b.x, b.y, 0xe23a8e);
+      this.burst(b.x, b.y, 0xfbbf24);
+      this.floater(b.x, b.y - 26, 'LEAK BURST!', 0xfbbf24);
+      return 'killed';
+    }
+    return 'hit';
+  }
+  bossFailFx() {
+    const p = this.bossPos();
+    this.burst(p.x, p.y, 0xf59e0b);
+    this.floater(this.w / 2, this.h * 0.22, 'PASSWORD COPIED!', 0xe23a8e);
+  }
+
+  // ---- clean-tide burst (feature: chain rewards) ----
+  tideFx() {
+    const n = this.nodes[this.nodes.length - 1];
+    this.burst(n.x, n.y, 0xfbbf24);
+    this.burst(n.x, n.y, 0xfbbf24);
+    this.floater(this.w / 2, this.h * 0.26, 'CLEAN TIDE!', 0xfbbf24);
+  }
   showDecoys(on: boolean) {
     this.showDecoy = on;
     if (!on) {
@@ -376,6 +498,8 @@ export class Whiteboard {
           if (this.footOn) {
             this.ghostPaths.push([...b.trace.pts]);
           }
+          this.thieves = [];
+          this.thiefTimer = 0;
           this.onDeliver?.(b.clean);
         }
         const last = this.nodes[this.nodes.length - 1];
@@ -383,6 +507,30 @@ export class Whiteboard {
         b.trace.pos.y = last.y;
         this.bucket = null;
       }
+    }
+
+    // X-Ray thieves: creep toward the reservoir only while looking + in flight
+    if (this.xray && this.bucket && !this.bucket.delivered) {
+      this.thiefTimer -= dt;
+      if (this.thiefTimer <= 0 && this.thieves.length < 3) {
+        this.spawnThief();
+        this.thiefTimer = 90 + Math.random() * 90;
+      }
+      for (let i = this.thieves.length - 1; i >= 0; i--) {
+        const t = this.thieves[i];
+        t.prog += t.speed * dt;
+        t.pulse += 0.12 * dt;
+        if (t.prog >= 1) {
+          this.thieves.splice(i, 1);
+          this.onThiefMissed?.();
+        }
+      }
+    }
+
+    // boss: age + flash decay
+    if (this.boss) {
+      this.boss.t += 0.06 * dt;
+      this.boss.flash = Math.max(0, this.boss.flash - 0.04 * dt);
     }
 
     // leaks lifecycle
@@ -497,6 +645,37 @@ export class Whiteboard {
       }
       g.poly(pts).fill({ color: 0xe23a8e, alpha: 0.9 });
     });
+    // X-Ray thief packets — magenta squares riding the pipe (tap to strip)
+    if (this.xray) {
+      this.thieves.forEach((t) => {
+        const p = this.nodePathPoint(t.prog);
+        const k = 5 + Math.sin(t.pulse) * 1.5;
+        g.circle(p.x, p.y, k + 4).fill({ color: 0xe23a8e, alpha: 0.18 });
+        g.rect(p.x - k, p.y - k, k * 2, k * 2).fill({ color: 0xe23a8e, alpha: 0.95 });
+        g.rect(p.x - 1, p.y - 1, 2, 2).fill({ color: 0xffffff, alpha: 0.9 });
+      });
+    }
+    // boss leak — pulsing spike ring over the reservoir
+    if (this.boss) {
+      const b = this.boss;
+      const r = 24 + Math.sin(b.t) * 3;
+      g.circle(b.x, b.y, r + 8).fill({ color: 0xe23a8e, alpha: 0.2 });
+      const pts: number[] = [];
+      for (let k = 0; k < 14; k++) {
+        const ang = (k / 14) * Math.PI * 2 + b.t;
+        const rad = k % 2 ? r : r * 0.5;
+        pts.push(b.x + Math.cos(ang) * rad, b.y + Math.sin(ang) * rad);
+      }
+      g.poly(pts).fill({ color: 0xe23a8e, alpha: 0.95 });
+      // hp bar
+      const bw = 44;
+      g.rect(b.x - bw / 2, b.y - r - 14, bw, 5).fill({ color: 0x0b1220, alpha: 0.85 });
+      g.rect(b.x - bw / 2, b.y - r - 14, bw * (b.hp / b.maxHp), 5).fill({
+        color: b.hp <= 2 ? 0xe23a8e : 0xfbbf24,
+        alpha: 0.95
+      });
+      if (b.flash > 0) g.circle(b.x, b.y, r + 8).stroke({ color: 0xffffff, alpha: b.flash, width: 3 });
+    }
     // particles
     this.particles.forEach((p) => g.circle(p.x, p.y, 3).fill({ color: p.color, alpha: Math.max(0, p.life) }));
     // bucket

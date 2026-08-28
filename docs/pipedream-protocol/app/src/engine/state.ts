@@ -25,6 +25,8 @@ export class GameState {
   leaksZapped = 0;
   lessonIdx = 0;
   quizOpen = false;
+  // Clean-tide chain: grows to 3 with consecutive clean deliveries, resets on dirty.
+  tide = 0;
 
   private listeners: Record<string, Listener[]> = {};
 
@@ -56,10 +58,14 @@ export class GameState {
       this.combo++;
       this.bestCombo = Math.max(this.bestCombo, this.combo);
       this.addXp(Math.round(30 * this.comboMult()));
+      this.tide = Math.min(3, this.tide + 1);
+      if (this.tide === 3) this.emit('tide', true);
     } else {
       this.combo = 0;
       this.cw = Math.max(0, this.cw - 8);
       this.addXp(5);
+      this.tide = 0;
+      this.emit('tide', false);
     }
     this.emit('change');
   }

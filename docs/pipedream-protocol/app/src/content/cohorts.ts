@@ -1,6 +1,6 @@
 import type { CohortId } from '../engine/state';
 
-export type LineKey = 'open' | 'send' | 'xray' | 'lvl' | 'mission' | 'combo' | 'wrong' | 'roast' | 'deadApp';
+export type LineKey = 'open' | 'send' | 'xray' | 'lvl' | 'mission' | 'combo' | 'wrong' | 'roast' | 'deadApp' | 'thief' | 'tide' | 'boss' | 'bossFail';
 
 // Cohort-adaptive Brick lines (GDD 3 + 6). One set of facts, four voices.
 export const LINES: Record<CohortId, Record<LineKey, string>> = {
@@ -13,7 +13,11 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     combo: 'COMBO x{n}! You\'re on fire - keep the clean chain going!',
     wrong: 'Not quite - take another look, you got this.',
     roast: "bro really typed '123456' in 2026 💀",
-    deadApp: "That app's locked for now. MailDrop's the one."
+    deadApp: "That app's locked for now. MailDrop's the one.",
+    thief: "One got through. X-Ray sooner and strip it before it hits the reservoir.",
+    tide: 'CLEAN TIDE! Three clean sends in a row. Look at that pipe glow.',
+    boss: 'BIG LEAK! Tap it over and over to burst it before it copies your password.',
+    bossFail: 'The leak copied your password. Change it - and burst it next time.'
   },
   y: {
     open: 'Open MailDrop. Pro tip: your email is your internet passport. Boring lasts.',
@@ -24,7 +28,11 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     combo: "COMBO x{n}! That's the energy. Gatekeepers hate this.",
     wrong: 'Close. The receipt was the tell. Try again.',
     roast: 'That password has the energy of a default Gmail 💀',
-    deadApp: 'Not that one. Open MailDrop for this mission.'
+    deadApp: 'Not that one. Open MailDrop for this mission.',
+    thief: 'A packet slipped through. X-Ray earlier - thieves can\'t hide from your taps.',
+    tide: 'CLEAN TIDE! An unbroken chain. The whole network feels it.',
+    boss: 'Boss leak incoming. Hammer it with taps before it memorizes your password.',
+    bossFail: 'It copied your password. Lesson learned - burst leaks fast.'
   },
   p: {
     open: 'Open MailDrop. Fifteen minutes here saves hours of cleanup later.',
@@ -35,7 +43,11 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     combo: 'COMBO x{n}. Efficient and clean - exactly the habit.',
     wrong: 'Almost - review the hint and retry.',
     roast: "I've seen stronger passwords on sticky notes at the office.",
-    deadApp: 'That module is inactive today. MailDrop is the active one.'
+    deadApp: 'That module is inactive today. MailDrop is the active one.',
+    thief: 'A packet reached the end unstripped. X-Ray early to catch what rides along.',
+    tide: 'Clean Tide achieved - three deliveries, zero taint. Excellent discipline.',
+    boss: 'Priority threat: a boss leak. Strike its core repeatedly to contain it.',
+    bossFail: 'It breached and captured your password. Contain threats before they escalate.'
   },
   m: {
     open: 'Hello, and welcome. Tap MailDrop when you are ready - no rush at all.',
@@ -46,7 +58,11 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     combo: 'COMBO x{n}. Lovely rhythm - one clean step after another.',
     wrong: 'Not quite - look again, there is no rush.',
     roast: 'Oh dear. That password would not survive five seconds out there.',
-    deadApp: 'That one is not part of this lesson. Back to MailDrop, gently.'
+    deadApp: 'That one is not part of this lesson. Back to MailDrop, gently.',
+    thief: 'One small packet turned aside. Watch closely next time and you will catch it.',
+    tide: 'Three clean deliveries together - a lovely tide. The pipes thank you.',
+    boss: 'A large leak is forming. Touch it calmly, several times, and it will subside.',
+    bossFail: 'It reached your password. All the more reason to tend to leaks promptly.'
   }
 };
 

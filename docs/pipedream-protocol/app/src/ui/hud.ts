@@ -8,6 +8,7 @@ export class Hud {
   private objEl = el('div', { id: 'obj', textContent: 'Loading…' });
   private lvlEl = el('span', { id: 'lvlVal', textContent: 'Lv 1' });
   private comboEl = el('span', { id: 'comboVal', textContent: '' });
+  private tideEl = el('span', { id: 'tideVal', textContent: '' });
   private lessonEl = el('span', { id: 'lessonVal', textContent: '' });
   private cbtns: HTMLElement[] = [];
 
@@ -15,7 +16,7 @@ export class Hud {
     this.state = state;
     const cwBox = el('div', { className: 'score cw-score' }, el('span', { className: 'drop' }), this.cwEl, ' Safety');
     const xpBox = el('div', { className: 'score' }, this.xpEl, ' XP');
-    const pill = el('div', { className: 'pill' }, this.lvlEl, ' · ', this.comboEl);
+    const pill = el('div', { className: 'pill' }, this.lvlEl, ' · ', this.comboEl, this.tideEl);
     const help = el('div', { className: 'pill', id: 'helpBtn', textContent: '? Help' });
     help.onclick = opts.onHelp;
     const beta = el('div', { className: 'pill', textContent: 'BETA', style: 'border-color:#FBBF24;color:#FBBF24' });
@@ -43,6 +44,8 @@ export class Hud {
     this.xpEl.textContent = String(this.state.xp);
     this.lvlEl.textContent = 'Lv ' + this.state.level;
     this.comboEl.textContent = this.state.combo > 0 ? 'x' + this.state.comboMult().toFixed(1) : '';
+    this.tideEl.textContent = this.state.tide > 0 ? ' · ' + '⟢'.repeat(this.state.tide) : '';
+    this.tideEl.style.color = this.state.tide === 3 ? '#fbbf24' : '#34d399';
     // CW color: green > 60, amber 30-60, red < 30
     const cwScore = this.cwEl.parentElement;
     if (cwScore) {

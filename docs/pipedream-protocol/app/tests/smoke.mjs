@@ -49,7 +49,7 @@ async function main() {
     await page.click(`#walk-${i}`);
   }
 
-  // Helper: play one lesson cycle (open mail → send → quiz)
+  // Helper: play one lesson cycle (open mail → send → zap threats → quiz)
   async function playLesson(pwSuffix) {
     // Dismiss cookie banner if visible
     if (await page.$('#cookie.show')) await page.click('#cookieEssential');
@@ -62,6 +62,25 @@ async function main() {
     // Dismiss cookie again in case it appeared after appMail click
     if (await page.$('#cookie.show')) await page.click('#cookieEssential');
     await page.click('#send');
+    // Cookie roulette: on the cookies lesson the banner shows ~900ms after send —
+    // dismiss it (as a player would) instead of letting it time out.
+    await page.waitForTimeout(1400);
+    if (await page.$('#cookie.show')) await page.click('#cookieEssential');
+    // Zap active leaks + tap the boss so the pressure drain can't dry the pipes.
+    await page.evaluate(() => {
+      const stage = document.querySelector('#stage');
+      const r = stage.getBoundingClientRect();
+      const pts = window.Pipedream.wb.leakPoints();
+      for (const p of pts) {
+        stage.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + p.x, clientY: r.top + p.y }));
+      }
+      const b = window.Pipedream.wb.bossPoint();
+      if (b) {
+        for (let k = 0; k < 3; k++) {
+          stage.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + b.x, clientY: r.top + b.y }));
+        }
+      }
+    });
     // Wait for quiz and answer correctly
     await page.waitForSelector('.qopt', { timeout: 15000 });
     await page.click('.qopt[data-correct="true"]');
