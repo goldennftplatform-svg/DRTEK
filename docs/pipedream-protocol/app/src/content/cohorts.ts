@@ -1,6 +1,6 @@
 import type { CohortId } from '../engine/state';
 
-export type LineKey = 'open' | 'send' | 'xray' | 'lvl' | 'mission' | 'combo' | 'wrong' | 'roast';
+export type LineKey = 'open' | 'send' | 'xray' | 'lvl' | 'mission' | 'combo' | 'wrong' | 'roast' | 'deadApp';
 
 // Cohort-adaptive Brick lines (GDD 3 + 6). One set of facts, four voices.
 export const LINES: Record<CohortId, Record<LineKey, string>> = {
@@ -12,7 +12,8 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     mission: "Nice. Next mission's on the top bar - go get it.",
     combo: 'COMBO x{n}! You\'re on fire - keep the clean chain going!',
     wrong: 'Not quite - take another look, you got this.',
-    roast: "bro really typed '123456' in 2026 💀"
+    roast: "bro really typed '123456' in 2026 💀",
+    deadApp: "That app's locked for now. MailDrop's the one."
   },
   y: {
     open: 'Open MailDrop. Pro tip: your email is your internet passport. Boring lasts.',
@@ -22,7 +23,8 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     mission: "Mission cleared. Streak's building. Don't break it.",
     combo: "COMBO x{n}! That's the energy. Gatekeepers hate this.",
     wrong: 'Close. The receipt was the tell. Try again.',
-    roast: 'That password has the energy of a default Gmail 💀'
+    roast: 'That password has the energy of a default Gmail 💀',
+    deadApp: 'Not that one. Open MailDrop for this mission.'
   },
   p: {
     open: 'Open MailDrop. Fifteen minutes here saves hours of cleanup later.',
@@ -32,7 +34,8 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     mission: 'Task complete. The next one is queued above.',
     combo: 'COMBO x{n}. Efficient and clean - exactly the habit.',
     wrong: 'Almost - review the hint and retry.',
-    roast: "I've seen stronger passwords on sticky notes at the office."
+    roast: "I've seen stronger passwords on sticky notes at the office.",
+    deadApp: 'That module is inactive today. MailDrop is the active one.'
   },
   m: {
     open: 'Hello, and welcome. Tap MailDrop when you are ready - no rush at all.',
@@ -42,7 +45,8 @@ export const LINES: Record<CohortId, Record<LineKey, string>> = {
     mission: 'Nicely done. Your next small task is shown at the top.',
     combo: 'COMBO x{n}. Lovely rhythm - one clean step after another.',
     wrong: 'Not quite - look again, there is no rush.',
-    roast: 'Oh dear. That password would not survive five seconds out there.'
+    roast: 'Oh dear. That password would not survive five seconds out there.',
+    deadApp: 'That one is not part of this lesson. Back to MailDrop, gently.'
   }
 };
 

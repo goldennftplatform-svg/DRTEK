@@ -72,7 +72,8 @@ export class Game {
       onSend: (pw) => this.onSend(pw),
       onQuizAnswer: (correct) => this.answerQuiz(correct),
       onCookie: (ess) => this.handleCookie(ess),
-      onReplay: () => this.replay()
+      onReplay: () => this.replay(),
+      onDeadApp: () => this.onDeadApp()
     });
 
     root.append(hudEl, this.stage, phoneWrap);
@@ -229,12 +230,8 @@ export class Game {
     this.phone.resetForm();
     this.phone.guide();
     this.phone.showMailCallout(false);
-    // Cookie: Brick warns FIRST, banner appears after a delay
-    if (L.id === 2) {
-      setTimeout(() => this.phone.showCookie(true), 2200);
-    } else {
-      this.phone.showCookie(false);
-    }
+    // Cookie banner is triggered AFTER the player sends (see onSend), so it never covers Send.
+    this.phone.showCookie(false);
     this.wb.showDecoys(L.id === 4);
     this.wb.showEncryption(L.id === 5);
     this.wb.showPrivacy(L.id === 6);
@@ -263,6 +260,19 @@ export class Game {
       this.say(cohortLine(this.cohort, 'roast'));
     } else {
       this.say(cohortLine(this.cohort, 'send'));
+    }
+    // Cookies lesson: the site asks for cookies right after you send your data
+    if (LESSONS[this.state.lessonIdx].id === 2) {
+      setTimeout(() => this.phone.showCookie(true), 900);
+    }
+  }
+
+  private onDeadApp() {
+    sfx.click();
+    if (this.phase >= 6 && this.phase <= 8 && !this.state.quizOpen) {
+      this.say(cohortLine(this.cohort, 'deadApp'));
+    } else {
+      this.say('That app is still locked. MailDrop is the one for now.');
     }
   }
 

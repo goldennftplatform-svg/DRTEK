@@ -8,6 +8,7 @@ export interface PhoneCallbacks {
   onQuizAnswer: (correct: boolean) => void;
   onCookie: (essential: boolean) => void;
   onReplay: () => void;
+  onDeadApp: () => void;
 }
 
 export class Phone {
@@ -39,6 +40,8 @@ export class Phone {
     const appStreamly = el('div', { className: 'app dead', textContent: 'Streamly' });
     const appChirp = el('div', { className: 'app dead', textContent: 'Chirp' });
     const appBrowser = el('div', { className: 'app dead', textContent: 'Browser' });
+    const deadApps = [appStreamly, appChirp, appBrowser];
+    deadApps.forEach((a) => { a.onclick = cb.onDeadApp; });
 
     this.appgrid = el('div', { id: 'appgrid' }, this.appMail, appStreamly, appChirp, appBrowser);
 
@@ -112,6 +115,8 @@ export class Phone {
     this.mailform.classList.add('show');
     this.appgrid.style.display = 'none';
     this.mailCallout.style.display = 'none';
+    // Never let the cookie banner cover the Send button while typing
+    this.cookie.classList.remove('show');
   }
   resetForm() {
     this.appMail.classList.remove('on');
